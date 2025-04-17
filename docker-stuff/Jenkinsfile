@@ -1,0 +1,45 @@
+pipeline {
+    agent any
+
+    environment {
+        IMAGE_NAME = "jaco117/jaco-flask"
+        COMMIT_SHA = sh(script: 'git rev-parse --short HEAD', returnStdout: true).trim()
+		TAG = "${COMMIT_SHA}"
+    }
+
+    triggers {
+        pollSCM('H/2 * * * *') // or use a webhook for push-based trigger
+    }
+
+    stages {
+        stage('Checkout') {
+            steps {
+                git branch: 'master', url: 'https://github.com/jck-sz/learning-cicd.git'
+            }
+        }
+
+		stage('Build Docker Image') {
+			steps {
+				script {
+					docker.build("${IMAGE_NAME}:${TAG}", "-f docker-stuff/Dockerfile .")
+			}
+		}
+	}
+
+        stage('Push Docker Image') {
+            steps {
+                withDockerRegistry([credentialsId: '410ca28f-b21b-4735-990b-8a5fdccf601f', url: '']) {
+                    script {
+                        docker.image("${IMAGE_NAME}:${TAG}").push()
+                    }
+                }
+            }
+        }
+
+        stage('Run Container') {
+            steps {
+                sh "docker run -p 1337:1337 --rm ${IMAGE_NAME}:${TAG}"
+            }
+        }
+    }
+}
