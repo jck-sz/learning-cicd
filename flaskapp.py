@@ -24,6 +24,13 @@ def hello():
         </body>
     </html>
     """
+    
+@app.route('/test')
+def stuff():
+    return "This is a test"
+    
+# Print registered routes
+print(app.url_map)
 
 if __name__ == '__main__':
     app.run(host='0.0.0.0', port=1337, debug=True)
