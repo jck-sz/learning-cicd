@@ -4,7 +4,7 @@ pipeline {
     environment {
         IMAGE_NAME = "jaco117/jaco-flask"
         COMMIT_SHA = sh(script: 'git rev-parse --short HEAD', returnStdout: true).trim()
-		TAG = "${COMMIT_SHA}"
+        TAG = "${COMMIT_SHA}"
     }
 
     triggers {
@@ -18,13 +18,13 @@ pipeline {
             }
         }
 
-		stage('Build Docker Image') {
-			steps {
-				script {
-					docker.build("${IMAGE_NAME}:${TAG}", "-f docker-stuff/Dockerfile .")
-			}
-		}
-	}
+        stage('Build Docker Image') {
+            steps {
+                script {
+                    docker.build("${IMAGE_NAME}:${TAG}", "-f docker-stuff/Dockerfile .")
+                }
+            }
+        }
 
         stage('Push Docker Image') {
             steps {
@@ -36,9 +36,22 @@ pipeline {
             }
         }
 
-        stage('Run Container') {
+        stage('Stop Current Container') {
             steps {
-                sh "docker run -p 1337:1337 --rm ${IMAGE_NAME}:${TAG}"
+                script {
+                    def containerId = sh(script: "docker ps -q --filter 'ancestor=${IMAGE_NAME}:${TAG}'", returnStdout: true).trim()
+                    if (containerId) {
+                        sh "docker stop ${containerId}"
+                    } else {
+                        echo "No running container found for ${IMAGE_NAME}:${TAG}."
+                    }
+                }
+            }
+        }
+
+        stage('Run New Container') {
+            steps {
+                sh "docker run -d -p 1337:1337 --rm ${IMAGE_NAME}:${TAG}"
             }
         }
     }
