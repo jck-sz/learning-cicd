@@ -3,7 +3,27 @@ app = Flask(__name__)
 
 @app.route('/')
 def hello():
-    return "Hello, world! Test123"
+    return """
+    <html>
+        <head>
+            <style>
+                body {
+                    background-color: #f0f8ff; /* Light blue background */
+                    font-family: Arial, sans-serif;
+                    text-align: center;
+                    padding: 50px;
+                }
+                h1 {
+                    color: #4CAF50; /* Green text */
+                }
+            </style>
+        </head>
+        <body>
+            <h1>Hello, world!</h1>
+            <p>Test 123<br>Have a great day!</p>
+        </body>
+    </html>
+    """
 
 if __name__ == '__main__':
     app.run(host='0.0.0.0', port=1337, debug=True)
