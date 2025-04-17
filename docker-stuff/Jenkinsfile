@@ -3,6 +3,7 @@ pipeline {
 
     environment {
         IMAGE_NAME = "jaco117/jaco-flask"
+        // Get the commit SHA (short version) from the Git repo.
         COMMIT_SHA = sh(script: 'git rev-parse --short HEAD', returnStdout: true).trim()
         TAG = "${COMMIT_SHA}"
     }
@@ -10,6 +11,7 @@ pipeline {
     stages {
         stage('Checkout') {
             steps {
+                // Checkout from the repository (assumed branch "main")
                 git branch: 'main', url: 'https://github.com/jck-sz/learning-cicd.git'
             }
         }
@@ -17,6 +19,7 @@ pipeline {
         stage('Build Docker Image') {
             steps {
                 script {
+                    // Build the image locally using your Dockerfile (located at docker-stuff/Dockerfile)
                     docker.build("${IMAGE_NAME}:${TAG}", "-f docker-stuff/Dockerfile .")
                 }
             }
@@ -24,36 +27,51 @@ pipeline {
 
         stage('Push Docker Image') {
             steps {
+                // Use DockerHub credentials (ID '410ca28f-b21b-4735-990b-8a5fdccf601f')
                 withDockerRegistry([credentialsId: '410ca28f-b21b-4735-990b-8a5fdccf601f', url: '']) {
                     script {
+                        // Push the image tagged by commit SHA
                         docker.image("${IMAGE_NAME}:${TAG}").push()
-						
-						docker.image("${IMAGE_NAME}:${TAG}").tag('latest')
-						docker.image("${IMAGE_NAME}:latest").push()
+                        // Also tag the image as 'latest' and push that
+                        docker.image("${IMAGE_NAME}:${TAG}").tag('latest')
+                        docker.image("${IMAGE_NAME}:latest").push()
                     }
                 }
             }
         }
 
-        stage('Stop Current Container') {
-			steps {
-				script {
-					def containerId = sh(script: "docker ps -q --filter 'name=running-container'", returnStdout: true).trim()
-					if (!containerId) {
-						containerId = sh(script: "docker ps -q --filter 'label=app=jaco-flask'", returnStdout: true).trim()
-					}
-					if (containerId) {
-						sh "docker stop ${containerId}"
-					} else {
-						echo "No running container found for jaco-flask."
-					}
-				}
-			}
-		}
-
-        stage('Run New Container') {
+        stage('Stop Docker Containers on Remote') {
             steps {
-                sh "docker run -d -p 1337:1337 --rm --name running-container -l app=jaco-flask ${IMAGE_NAME}:${TAG}"
+                // Retrieve the remote server IP from Jenkins credentials (ID "backend-server-ip")
+                withCredentials([string(credentialsId: 'backend-server-ip', variable: 'REMOTE_IP')]) {
+                    // Use the SSH deploy credentials (ID "04e315ec-730b-43d4-bb86-7ca4f10cb8c7")
+                    sshagent(credentials: ['04e315ec-730b-43d4-bb86-7ca4f10cb8c7']) {
+                        script {
+                            // Option '-o StrictHostKeyChecking=no' avoids host key prompt.
+                            sh """
+                                ssh -o StrictHostKeyChecking=no deploy-user@${REMOTE_IP} 'docker ps -q --filter "name=running-container" | xargs -r docker stop'
+                                ssh -o StrictHostKeyChecking=no deploy-user@${REMOTE_IP} 'docker ps -q --filter "label=app=jaco-flask" | xargs -r docker stop'
+                            """
+                        }
+                    }
+                }
+            }
+        }
+
+        stage('Run New Containers on Remote') {
+            steps {
+                withCredentials([string(credentialsId: 'backend-server-ip', variable: 'REMOTE_IP')]) {
+                    sshagent(credentials: ['04e315ec-730b-43d4-bb86-7ca4f10cb8c7']) {
+                        script {
+                            // Pull the latest image and then run two containers with specified port mappings.
+                            sh """
+                                ssh -o StrictHostKeyChecking=no deploy-user@${REMOTE_IP} 'docker pull ${IMAGE_NAME}:latest'
+                                ssh -o StrictHostKeyChecking=no deploy-user@${REMOTE_IP} 'docker run -d -p 8088:1337 --rm --name container_8088 -l app=jaco-flask ${IMAGE_NAME}:latest'
+                                ssh -o StrictHostKeyChecking=no deploy-user@${REMOTE_IP} 'docker run -d -p 8089:1337 --rm --name container_8089 -l app=jaco-flask ${IMAGE_NAME}:latest'
+                            """
+                        }
+                    }
+                }
             }
         }
     }
