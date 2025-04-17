@@ -40,21 +40,24 @@ pipeline {
         }
 
         stage('Stop Current Container') {
-            steps {
-                script {
-                    def containerId = sh(script: "docker ps -q --filter 'ancestor=${IMAGE_NAME}:${TAG}'", returnStdout: true).trim()
-                    if (containerId) {
-                        sh "docker stop ${containerId}"
-                    } else {
-                        echo "No running container found for ${IMAGE_NAME}:${TAG}."
-                    }
-                }
-            }
-        }
+			steps {
+				script {
+					def containerId = sh(script: "docker ps -q --filter 'name=running-container'", returnStdout: true).trim()
+					if (!containerId) {
+						containerId = sh(script: "docker ps -q --filter 'label=app=jaco-flask'", returnStdout: true).trim()
+					}
+					if (containerId) {
+						sh "docker stop ${containerId}"
+					} else {
+						echo "No running container found for jaco-flask."
+					}
+				}
+			}
+		}
 
         stage('Run New Container') {
             steps {
-                sh "docker run -d -p 1337:1337 --rm ${IMAGE_NAME}:${TAG}"
+                sh "docker run -d -p 1337:1337 --rm --name running-container -l app=jaco-flask ${IMAGE_NAME}:${TAG}"
             }
         }
     }
