@@ -8,7 +8,7 @@ pipeline {
     }
 
     triggers {
-        pollSCM('H/1 * * * *') // or use a webhook for push-based trigger
+        pollSCM('H/2 * * * *') // or use a webhook for push-based trigger
     }
 
     stages {
