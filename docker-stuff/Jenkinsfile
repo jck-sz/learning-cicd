@@ -41,22 +41,23 @@ pipeline {
         }
 
         stage('Stop Docker Containers on Remote') {
-            steps {
-                // Retrieve the remote server IP from Jenkins credentials (ID "backend-server-ip")
-                withCredentials([string(credentialsId: 'backend-server-ip', variable: 'REMOTE_IP')]) {
-                    // Use the SSH deploy credentials (ID "04e315ec-730b-43d4-bb86-7ca4f10cb8c7")
-                    sshagent(credentials: ['04e315ec-730b-43d4-bb86-7ca4f10cb8c7']) {
-                        script {
-                            // Option '-o StrictHostKeyChecking=no' avoids host key prompt.
-                            sh """
-                                ssh -o StrictHostKeyChecking=no deploy-user@${REMOTE_IP} 'docker ps -q --filter "name=running-container" | xargs -r docker stop'
-                                ssh -o StrictHostKeyChecking=no deploy-user@${REMOTE_IP} 'docker ps -q --filter "label=app=jaco-flask" | xargs -r docker stop'
-                            """
-                        }
-                    }
-                }
-            }
-        }
+			steps {
+				withCredentials([string(credentialsId: 'backend-server-ip', variable: 'REMOTE_IP')]) {
+					sshagent(credentials: ['04e315ec-730b-43d4-bb86-7ca4f10cb8c7']) {
+						script {
+						// Stop container by name if it exists
+						sh """
+						ssh -o StrictHostKeyChecking=no deploy-user@${REMOTE_IP} 'container=$(docker ps -q --filter "name=running-container"); if [ -n "$container" ]; then docker stop $container; else echo "No running container found with name running-container"; fi'
+						"""
+						// Stop container by label if it exists
+						sh """
+						ssh -o StrictHostKeyChecking=no deploy-user@${REMOTE_IP} 'container=$(docker ps -q --filter "label=app=jaco-flask"); if [ -n "$container" ]; then docker stop $container; else echo "No running container found with label app=jaco-flask"; fi'
+						"""
+						}
+					}
+				}
+			}
+		}
 
         stage('Run New Containers on Remote') {
             steps {
