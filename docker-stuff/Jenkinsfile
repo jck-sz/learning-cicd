@@ -7,10 +7,6 @@ pipeline {
         TAG = "${COMMIT_SHA}"
     }
 
-    triggers {
-        pollSCM('H/2 * * * *') // or use a webhook for push-based trigger
-    }
-
     stages {
         stage('Checkout') {
             steps {
